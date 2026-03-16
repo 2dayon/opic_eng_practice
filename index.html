@@ -1,0 +1,316 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>OPIc 랜덤 질문 룰렛</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        @keyframes roulette {
+            0% { transform: translateY(100%); opacity: 0; }
+            10% { transform: translateY(0); opacity: 1; }
+            90% { transform: translateY(0); opacity: 1; }
+            100% { transform: translateY(-100%); opacity: 0; }
+        }
+        .roulette-active {
+            animation: roulette 0.1s infinite linear;
+        }
+    </style>
+</head>
+<body class="bg-gray-100 flex items-center justify-center min-h-screen">
+
+    <div class="bg-white p-8 rounded-2xl shadow-xl w-full max-w-md text-center">
+        <h1 class="text-2xl font-bold text-blue-600 mb-6">OPIc 실전 연습</h1>
+
+        <div class="grid grid-cols-2 gap-2 mb-6" id="category-buttons">
+            <button onclick="startRoulette('공원가기')" class="bg-gray-200 hover:bg-blue-500 hover:text-white py-2 px-4 rounded-lg transition">🏞️ 공원가기</button>
+            <button onclick="startRoulette('음악감상')" class="bg-gray-200 hover:bg-blue-500 hover:text-white py-2 px-4 rounded-lg transition">🎧 음악감상</button>
+            <button onclick="startRoulette('자기소개')" class="bg-gray-200 hover:bg-blue-500 hover:text-white py-2 px-4 rounded-lg transition">👤 자기소개</button>
+            <button onclick="startRoulette('돌발질문')" class="bg-gray-200 hover:bg-red-500 hover:text-white py-2 px-4 rounded-lg transition">🚨 돌발질문</button>
+        </div>
+
+        <hr class="mb-6">
+
+        <div class="relative bg-blue-50 rounded-xl p-4 mb-2 min-h-[140px] flex flex-col items-center justify-center overflow-hidden">
+            <p id="roulette-text" class="absolute text-lg font-medium text-gray-400 hidden">질문 뽑는 중...</p>
+            <p id="question-text" class="text-lg font-medium text-gray-800 leading-relaxed text-balance transition-opacity duration-300">
+                주제를 선택하면 질문이 나타납니다.
+            </p>
+            <button id="showQuestionBtn" onclick="showQuestionText()" class="hidden mt-4 bg-white border border-blue-400 text-blue-600 hover:bg-blue-100 px-4 py-1.5 rounded-full font-medium transition text-sm shadow-sm">
+                👀 질문 텍스트 보기
+            </button>
+        </div>
+        
+        <div class="flex justify-end mb-4 min-h-[32px]">
+            <button id="replayBtn" onclick="replayQuestion()" class="hidden flex items-center gap-1 text-sm bg-blue-100 text-blue-700 hover:bg-blue-200 px-3 py-1.5 rounded-full font-semibold transition">
+                <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" class="w-4 h-4">
+                    <path stroke-linecap="round" stroke-linejoin="round" d="M19.114 5.636a9 9 0 010 12.728M16.463 8.288a5.25 5.25 0 010 7.424M6.75 8.25l4.72-4.72a.75.75 0 011.28.53v15.88a.75.75 0 01-1.28.53l-4.72-4.72H4.51c-.88 0-1.704-.507-1.938-1.354A9.01 9.01 0 012.25 12c0-.83.112-1.633.322-2.396C2.806 8.756 3.63 8.25 4.51 8.25H6.75z" />
+                </svg>
+                Replay (다시듣기)
+            </button>
+        </div>
+
+        <div class="text-5xl font-mono font-bold text-gray-800 mb-6" id="timer">00:00</div>
+
+        <div class="mb-6 h-12 flex justify-center items-center">
+            <audio id="audio-playback" controls class="hidden w-full h-10 outline-none"></audio>
+        </div>
+
+        <div class="flex gap-4">
+            <button id="startBtn" onclick="toggleAnswer()" class="flex-1 bg-green-500 text-white py-3 rounded-xl font-bold shadow-lg hover:bg-green-600 transition">답변 시작</button>
+            <button onclick="resetAll()" class="flex-1 bg-gray-400 text-white py-3 rounded-xl font-bold shadow-lg hover:bg-gray-500 transition">리셋</button>
+        </div>
+    </div>
+
+    <script>
+        const data = {
+            "공원가기": [
+                "You indicated in the survey that you like going to parks. Tell me about the park you visit most often.", 
+                "What do you usually do at the park? Who do you go with? Tell me in detail.", 
+                "Tell me about a memorable experience you had at a park recently. What exactly happened?"
+            ],
+            "음악감상": [
+                "What is your favorite genre of music, and who is your favorite musician?", 
+                "What kind of device do you use to listen to music? Where do you usually listen to it?", 
+                "How has your taste in music changed since you were a child? Compare the music you liked then to now."
+            ],
+            "자기소개": [
+                "Let's start the interview. Please tell me a little bit about yourself.", 
+                "Tell me about your typical day. What do you do from morning to evening?"
+            ],
+            "돌발질문": [
+                "I would like to know about the geography of your country. Tell me about the weather and seasons.", 
+                "Think about a restaurant or cafe you visited recently. Describe what it looked like and what you ate."
+            ]
+        };
+
+        const dummyQuestions = [
+            "What is your favorite...", "Tell me about a time...", "Describe the place...", "How often do you...", "Compared to the past...", "Who do you usually...", "When was the last time..."
+        ];
+
+        let timerInterval;
+        let seconds = 0;
+        let isRunning = false;
+        let isRolling = false; 
+        let currentQuestionText = ""; 
+
+        let mediaRecorder;
+        let audioChunks = [];
+        let audioStream;
+
+        // --- 오디오 엔진 깨우기 (Beep 사운드) 설정 ---
+        let audioCtx;
+        function initAudioContext() {
+            if (!audioCtx) {
+                audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+            }
+            if (audioCtx.state === 'suspended') {
+                audioCtx.resume();
+            }
+        }
+
+        // 삐 소리를 내고, 0.4초 뒤에 확실하게 에바 목소리 재생
+        function playBeepAndSpeak(text) {
+            initAudioContext();
+            
+            // 이전 음성 정지
+            window.speechSynthesis.cancel();
+
+            // 1. 짧은 알림음(Beep) 생성
+            const oscillator = audioCtx.createOscillator();
+            const gainNode = audioCtx.createGain();
+
+            oscillator.type = 'sine';
+            oscillator.frequency.setValueAtTime(600, audioCtx.currentTime); // 주파수 (부드러운 알림음)
+            
+            gainNode.gain.setValueAtTime(0.1, audioCtx.currentTime); // 볼륨
+            gainNode.gain.exponentialRampToValueAtTime(0.00001, audioCtx.currentTime + 0.2); // 0.2초 동안 소리 줄어듦
+
+            oscillator.connect(gainNode);
+            gainNode.connect(audioCtx.destination);
+
+            oscillator.start();
+            oscillator.stop(audioCtx.currentTime + 0.2);
+
+            // 2. 알림음이 끝나고 오디오 채널이 열린 상태에서 에바 목소리 시작
+            setTimeout(() => {
+                const utterance = new SpeechSynthesisUtterance(text);
+                utterance.lang = 'en-US';
+                utterance.rate = 0.95; 
+
+                if (voices.length === 0) { voices = window.speechSynthesis.getVoices(); }
+                const enVoices = voices.filter(v => v.lang.includes('en-US'));
+
+                if (enVoices.length > 0) {
+                    const evaVoice = enVoices.find(v => 
+                        v.name.includes('Google US English') || 
+                        v.name.includes('Zira') || 
+                        v.name.includes('Samantha') || 
+                        v.name.includes('Victoria') ||
+                        v.name.toLowerCase().includes('female')
+                    );
+                    utterance.voice = evaVoice || enVoices[0];
+                }
+                
+                window.speechSynthesis.speak(utterance);
+            }, 400); // 0.4초 대기 후 완벽하게 또렷한 목소리 출력
+        }
+
+        // --- TTS 목소리(에바) 로드 ---
+        let voices = [];
+        function loadVoices() { voices = window.speechSynthesis.getVoices(); }
+        window.speechSynthesis.onvoiceschanged = loadVoices;
+        loadVoices();
+
+        function replayQuestion() {
+            if (currentQuestionText !== "") {
+                playBeepAndSpeak(currentQuestionText);
+            }
+        }
+
+        function showQuestionText() {
+            document.getElementById('question-text').innerText = "Q: " + currentQuestionText;
+            document.getElementById('showQuestionBtn').classList.add('hidden'); 
+        }
+
+        function startRoulette(category) {
+            if (isRolling) return; 
+            isRolling = true;
+            
+            // 오디오 컨텍스트 초기화 (브라우저 정책 상 사용자 클릭 시 활성화 필요)
+            initAudioContext();
+            
+            resetAll(true); 
+            document.getElementById('replayBtn').classList.add('hidden');
+            document.getElementById('showQuestionBtn').classList.add('hidden'); 
+            
+            const qText = document.getElementById('question-text');
+            const rText = document.getElementById('roulette-text');
+            const buttons = document.querySelectorAll('#category-buttons button');
+
+            qText.classList.add('opacity-0');
+            rText.classList.remove('hidden');
+            rText.classList.add('roulette-active');
+            
+            buttons.forEach(b => b.disabled = true);
+
+            let dummyIndex = 0;
+            const dummyInterval = setInterval(() => {
+                rText.innerText = dummyQuestions[dummyIndex];
+                dummyIndex = (dummyIndex + 1) % dummyQuestions.length;
+            }, 50); 
+
+            setTimeout(() => {
+                clearInterval(dummyInterval); 
+                rText.classList.remove('roulette-active');
+                rText.classList.add('hidden');
+
+                const questions = data[category];
+                const randomIndex = Math.floor(Math.random() * questions.length);
+                currentQuestionText = questions[randomIndex]; 
+                
+                qText.innerText = "🔊 에바의 질문을 듣고 답변을 준비하세요.";
+                qText.classList.remove('opacity-0');
+                document.getElementById('showQuestionBtn').classList.remove('hidden');
+                
+                // [핵심 변경] 비프음 후 또렷하게 재생
+                playBeepAndSpeak(currentQuestionText);
+                
+                document.getElementById('replayBtn').classList.remove('hidden');
+
+                isRolling = false;
+                buttons.forEach(b => b.disabled = false); 
+            }, 1500); 
+        }
+
+        async function toggleAnswer() {
+            if (isRolling) return; 
+            const btn = document.getElementById('startBtn');
+            const audioPlayback = document.getElementById('audio-playback');
+
+            if (!isRunning) { 
+                seconds = 0;
+                updateTimerDisplay();
+
+                try {
+                    audioStream = await navigator.mediaDevices.getUserMedia({ audio: true });
+                    mediaRecorder = new MediaRecorder(audioStream);
+                    audioChunks = [];
+
+                    mediaRecorder.ondataavailable = event => {
+                        audioChunks.push(event.data);
+                    };
+
+                    mediaRecorder.onstop = () => {
+                        const audioBlob = new Blob(audioChunks, { type: 'audio/webm' });
+                        const audioUrl = URL.createObjectURL(audioBlob);
+                        audioPlayback.src = audioUrl;
+                        audioPlayback.classList.remove('hidden'); 
+                    };
+
+                    audioPlayback.classList.add('hidden'); 
+                    mediaRecorder.start();
+                    
+                    window.speechSynthesis.cancel(); 
+                    startTimer(); 
+                    btn.innerText = "답변 종료"; 
+                    btn.classList.replace('bg-green-500', 'bg-red-500'); 
+                    isRunning = true;
+
+                } catch (err) {
+                    alert("마이크 사용 권한을 허용해야 녹음할 수 있습니다!");
+                    console.error("마이크 접근 에러:", err);
+                }
+                
+            } else { 
+                stopTimer(); 
+                if (mediaRecorder && mediaRecorder.state === "recording") {
+                    mediaRecorder.stop();
+                    audioStream.getTracks().forEach(track => track.stop());
+                }
+
+                btn.innerText = "다시 답변하기"; 
+                btn.classList.replace('bg-red-500', 'bg-green-500'); 
+                isRunning = false;
+            }
+        }
+
+        function startTimer() { timerInterval = setInterval(() => { seconds++; updateTimerDisplay(); }, 1000); }
+        function stopTimer() { clearInterval(timerInterval); }
+        function resetTimer() { 
+            stopTimer(); 
+            seconds = 0; 
+            isRunning = false; 
+            updateTimerDisplay(); 
+            const btn = document.getElementById('startBtn');
+            btn.innerText = "답변 시작"; 
+            btn.className = "flex-1 bg-green-500 text-white py-3 rounded-xl font-bold shadow-lg hover:bg-green-600 transition"; 
+        }
+        function updateTimerDisplay() { 
+            const min = String(Math.floor(seconds / 60)).padStart(2, '0'); 
+            const sec = String(seconds % 60).padStart(2, '0'); 
+            document.getElementById('timer').innerText = `${min}:${sec}`; 
+        }
+        
+        function resetAll(isFromRoulette = false) { 
+            if (isRolling && !isFromRoulette) return; 
+            
+            if (mediaRecorder && mediaRecorder.state === "recording") {
+                mediaRecorder.stop();
+                if (audioStream) audioStream.getTracks().forEach(track => track.stop());
+            }
+
+            resetTimer(); 
+            window.speechSynthesis.cancel(); 
+            document.getElementById('audio-playback').classList.add('hidden'); 
+            
+            if (!isFromRoulette) {
+                currentQuestionText = "";
+                document.getElementById('question-text').innerText = "주제를 선택하면 질문이 나타납니다."; 
+                document.getElementById('replayBtn').classList.add('hidden');
+                document.getElementById('showQuestionBtn').classList.add('hidden');
+            }
+        }
+    </script>
+</body>
+</html>
