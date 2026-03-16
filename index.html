@@ -20,23 +20,35 @@
 <body class="bg-gray-100 flex items-center justify-center min-h-screen">
 
     <div class="bg-white p-8 rounded-2xl shadow-xl w-full max-w-md text-center">
-        <h1 class="text-2xl font-bold text-blue-600 mb-6">OPIc 실전 연습</h1>
-
-        <div class="grid grid-cols-2 gap-2 mb-6" id="category-buttons">
-            <button onclick="startRoulette('공원가기')" class="bg-gray-200 hover:bg-blue-500 hover:text-white py-2 px-4 rounded-lg transition">🏞️ 공원가기</button>
-            <button onclick="startRoulette('음악감상')" class="bg-gray-200 hover:bg-blue-500 hover:text-white py-2 px-4 rounded-lg transition">🎧 음악감상</button>
-            <button onclick="startRoulette('자기소개')" class="bg-gray-200 hover:bg-blue-500 hover:text-white py-2 px-4 rounded-lg transition">👤 자기소개</button>
-            <button onclick="startRoulette('돌발질문')" class="bg-gray-200 hover:bg-red-500 hover:text-white py-2 px-4 rounded-lg transition">🚨 돌발질문</button>
+        
+        <div class="flex items-center justify-between mb-6">
+            <div class="text-left w-5/12">
+                <label for="type-select" class="block text-[11px] font-bold text-gray-400 mb-1 tracking-wider">🎯 질문 유형 선택</label>
+                <select id="type-select" onchange="changeType()" class="bg-blue-50 border border-blue-200 text-blue-700 text-sm rounded-lg focus:ring-blue-500 focus:border-blue-500 block w-full p-2 outline-none font-bold cursor-pointer shadow-sm transition">
+                    <option value="설명/묘사">📝 설명 / 묘사</option>
+                    <option value="습관">🔄 일상 / 습관</option>
+                    <option value="과거경험">🕰️ 과거 경험</option>
+                    <option value="비교">⚖️ 과거와 비교</option>
+                </select>
+            </div>
+            <h1 class="text-2xl font-extrabold text-gray-800 w-7/12 text-right tracking-tight">OPIc <span class="text-blue-600">실전 연습</span></h1>
         </div>
 
-        <hr class="mb-6">
+        <div class="grid grid-cols-2 gap-2 mb-6" id="category-buttons">
+            <button onclick="startRoulette('공원가기')" class="bg-gray-100 border border-gray-200 hover:bg-blue-500 hover:text-white py-2.5 px-4 rounded-xl transition font-medium text-gray-700 hover:border-blue-500">🏞️ 공원가기</button>
+            <button onclick="startRoulette('음악감상')" class="bg-gray-100 border border-gray-200 hover:bg-blue-500 hover:text-white py-2.5 px-4 rounded-xl transition font-medium text-gray-700 hover:border-blue-500">🎧 음악감상</button>
+            <button onclick="startRoulette('자기소개')" class="bg-gray-100 border border-gray-200 hover:bg-blue-500 hover:text-white py-2.5 px-4 rounded-xl transition font-medium text-gray-700 hover:border-blue-500">👤 자기소개</button>
+            <button onclick="startRoulette('돌발질문')" class="bg-gray-100 border border-gray-200 hover:bg-red-500 hover:text-white py-2.5 px-4 rounded-xl transition font-medium text-gray-700 hover:border-red-500">🚨 돌발질문</button>
+        </div>
 
-        <div class="relative bg-blue-50 rounded-xl p-4 mb-2 min-h-[140px] flex flex-col items-center justify-center overflow-hidden">
+        <hr class="mb-6 border-gray-200">
+
+        <div class="relative bg-blue-50 rounded-xl p-4 mb-2 min-h-[140px] flex flex-col items-center justify-center overflow-hidden border border-blue-100">
             <p id="roulette-text" class="absolute text-lg font-medium text-gray-400 hidden">질문 뽑는 중...</p>
             <p id="question-text" class="text-lg font-medium text-gray-800 leading-relaxed text-balance transition-opacity duration-300">
-                주제를 선택하면 질문이 나타납니다.
+                왼쪽 위에서 유형을 고르고<br>주제를 선택해 주세요.
             </p>
-            <button id="showQuestionBtn" onclick="showQuestionText()" class="hidden mt-4 bg-white border border-blue-400 text-blue-600 hover:bg-blue-100 px-4 py-1.5 rounded-full font-medium transition text-sm shadow-sm">
+            <button id="toggleQuestionBtn" onclick="toggleQuestionText()" class="hidden mt-4 bg-white border border-blue-400 text-blue-600 hover:bg-blue-100 px-4 py-1.5 rounded-full font-medium transition text-sm shadow-sm">
                 👀 질문 텍스트 보기
             </button>
         </div>
@@ -63,25 +75,32 @@
     </div>
 
     <script>
-        const data = {
-            "공원가기": [
-                "You indicated in the survey that you like going to parks. Tell me about the park you visit most often.", 
-                "What do you usually do at the park? Who do you go with? Tell me in detail.", 
-                "Tell me about a memorable experience you had at a park recently. What exactly happened?"
-            ],
-            "음악감상": [
-                "What is your favorite genre of music, and who is your favorite musician?", 
-                "What kind of device do you use to listen to music? Where do you usually listen to it?", 
-                "How has your taste in music changed since you were a child? Compare the music you liked then to now."
-            ],
-            "자기소개": [
-                "Let's start the interview. Please tell me a little bit about yourself.", 
-                "Tell me about your typical day. What do you do from morning to evening?"
-            ],
-            "돌발질문": [
-                "I would like to know about the geography of your country. Tell me about the weather and seasons.", 
-                "Think about a restaurant or cafe you visited recently. Describe what it looked like and what you ate."
-            ]
+        // [핵심 변경] 주제 x 유형 매트릭스 데이터 구조로 업그레이드
+        const questionsDB = {
+            "공원가기": {
+                "설명/묘사": ["You indicated in the survey that you like going to parks. Tell me about the park you visit most often. What does it look like?"],
+                "습관": ["What do you usually do at the park? Who do you usually go with? Tell me in detail."],
+                "과거경험": ["Tell me about a memorable experience you had at a park recently. What exactly happened, and why was it memorable?"],
+                "비교": ["Compare the parks you used to go to when you were young to the ones you visit now. How have they changed?"]
+            },
+            "음악감상": {
+                "설명/묘사": ["What is your favorite genre of music, and who is your favorite musician? Why do you like them?"],
+                "습관": ["When and where do you usually listen to music? What kind of device do you use?"],
+                "과거경험": ["Tell me about a memorable concert or live music event you attended in the past. Describe the atmosphere."],
+                "비교": ["How has your taste in music changed since you were a child? Compare the music you liked then to the music you like now."]
+            },
+            "자기소개": {
+                "설명/묘사": ["Let's start the interview. Please tell me a little bit about yourself and your background."],
+                "습관": ["Tell me about your typical day. What do you usually do from morning to evening?"],
+                "과거경험": ["Tell me about a memorable project or activity you did in the past. What did you learn from it?"],
+                "비교": ["How has your personality or lifestyle changed compared to 5 years ago?"]
+            },
+            "돌발질문": {
+                "설명/묘사": ["I would like to know about the geography of your country. Tell me about the weather and seasons."],
+                "습관": ["What do people in your country usually do during their free time or on weekends?"],
+                "과거경험": ["Think about a restaurant or cafe you visited recently. Describe what happened there in detail."],
+                "비교": ["How have the transportation systems in your country changed over the last 10 years?"]
+            }
         };
 
         const dummyQuestions = [
@@ -93,38 +112,39 @@
         let isRunning = false;
         let isRolling = false; 
         let currentQuestionText = ""; 
+        let isTextVisible = false; 
+        
+        let currentType = "설명/묘사"; // 기본 선택 유형
 
         let mediaRecorder;
         let audioChunks = [];
         let audioStream;
 
-        // --- 오디오 엔진 깨우기 (Beep 사운드) 설정 ---
-        let audioCtx;
-        function initAudioContext() {
-            if (!audioCtx) {
-                audioCtx = new (window.AudioContext || window.webkitAudioContext)();
-            }
-            if (audioCtx.state === 'suspended') {
-                audioCtx.resume();
-            }
+        // 드롭다운 변경 시 유형 업데이트 함수
+        function changeType() {
+            const selectBox = document.getElementById("type-select");
+            currentType = selectBox.value;
+            resetAll(true); // 유형을 바꾸면 하단 상태 초기화
+            document.getElementById('question-text').innerText = `[${currentType}] 유형이 선택되었습니다.\n주제를 골라주세요.`;
         }
 
-        // 삐 소리를 내고, 0.4초 뒤에 확실하게 에바 목소리 재생
+        let audioCtx;
+        function initAudioContext() {
+            if (!audioCtx) { audioCtx = new (window.AudioContext || window.webkitAudioContext)(); }
+            if (audioCtx.state === 'suspended') { audioCtx.resume(); }
+        }
+
         function playBeepAndSpeak(text) {
             initAudioContext();
-            
-            // 이전 음성 정지
             window.speechSynthesis.cancel();
 
-            // 1. 짧은 알림음(Beep) 생성
             const oscillator = audioCtx.createOscillator();
             const gainNode = audioCtx.createGain();
 
             oscillator.type = 'sine';
-            oscillator.frequency.setValueAtTime(600, audioCtx.currentTime); // 주파수 (부드러운 알림음)
-            
-            gainNode.gain.setValueAtTime(0.1, audioCtx.currentTime); // 볼륨
-            gainNode.gain.exponentialRampToValueAtTime(0.00001, audioCtx.currentTime + 0.2); // 0.2초 동안 소리 줄어듦
+            oscillator.frequency.setValueAtTime(600, audioCtx.currentTime); 
+            gainNode.gain.setValueAtTime(0.1, audioCtx.currentTime); 
+            gainNode.gain.exponentialRampToValueAtTime(0.00001, audioCtx.currentTime + 0.2); 
 
             oscillator.connect(gainNode);
             gainNode.connect(audioCtx.destination);
@@ -132,7 +152,6 @@
             oscillator.start();
             oscillator.stop(audioCtx.currentTime + 0.2);
 
-            // 2. 알림음이 끝나고 오디오 채널이 열린 상태에서 에바 목소리 시작
             setTimeout(() => {
                 const utterance = new SpeechSynthesisUtterance(text);
                 utterance.lang = 'en-US';
@@ -153,36 +172,42 @@
                 }
                 
                 window.speechSynthesis.speak(utterance);
-            }, 400); // 0.4초 대기 후 완벽하게 또렷한 목소리 출력
+            }, 400); 
         }
 
-        // --- TTS 목소리(에바) 로드 ---
         let voices = [];
         function loadVoices() { voices = window.speechSynthesis.getVoices(); }
         window.speechSynthesis.onvoiceschanged = loadVoices;
         loadVoices();
 
         function replayQuestion() {
-            if (currentQuestionText !== "") {
-                playBeepAndSpeak(currentQuestionText);
-            }
+            if (currentQuestionText !== "") { playBeepAndSpeak(currentQuestionText); }
         }
 
-        function showQuestionText() {
-            document.getElementById('question-text').innerText = "Q: " + currentQuestionText;
-            document.getElementById('showQuestionBtn').classList.add('hidden'); 
+        function toggleQuestionText() {
+            const qText = document.getElementById('question-text');
+            const btn = document.getElementById('toggleQuestionBtn');
+
+            if (isTextVisible) {
+                qText.innerText = "🔊 에바의 질문을 듣고 답변을 준비하세요.";
+                btn.innerText = "👀 질문 텍스트 보기";
+                isTextVisible = false;
+            } else {
+                qText.innerHTML = `<span class="text-sm font-bold text-blue-500 block mb-1">[${currentType}]</span> Q: ${currentQuestionText}`;
+                btn.innerText = "🙈 질문 텍스트 숨기기";
+                isTextVisible = true;
+            }
         }
 
         function startRoulette(category) {
             if (isRolling) return; 
             isRolling = true;
             
-            // 오디오 컨텍스트 초기화 (브라우저 정책 상 사용자 클릭 시 활성화 필요)
             initAudioContext();
-            
             resetAll(true); 
+            
             document.getElementById('replayBtn').classList.add('hidden');
-            document.getElementById('showQuestionBtn').classList.add('hidden'); 
+            document.getElementById('toggleQuestionBtn').classList.add('hidden'); 
             
             const qText = document.getElementById('question-text');
             const rText = document.getElementById('roulette-text');
@@ -205,17 +230,22 @@
                 rText.classList.remove('roulette-active');
                 rText.classList.add('hidden');
 
-                const questions = data[category];
+                // [핵심 변경] 선택한 '유형'과 '주제'에 맞는 질문 배열 가져오기
+                const questions = questionsDB[category][currentType];
+                
+                // 해당 유형에 질문이 1개 이상 있으면 랜덤으로 뽑기 (현재는 각각 1개씩 세팅됨)
                 const randomIndex = Math.floor(Math.random() * questions.length);
                 currentQuestionText = questions[randomIndex]; 
                 
+                isTextVisible = false;
                 qText.innerText = "🔊 에바의 질문을 듣고 답변을 준비하세요.";
                 qText.classList.remove('opacity-0');
-                document.getElementById('showQuestionBtn').classList.remove('hidden');
                 
-                // [핵심 변경] 비프음 후 또렷하게 재생
+                const toggleBtn = document.getElementById('toggleQuestionBtn');
+                toggleBtn.innerText = "👀 질문 텍스트 보기";
+                toggleBtn.classList.remove('hidden');
+                
                 playBeepAndSpeak(currentQuestionText);
-                
                 document.getElementById('replayBtn').classList.remove('hidden');
 
                 isRolling = false;
@@ -237,9 +267,7 @@
                     mediaRecorder = new MediaRecorder(audioStream);
                     audioChunks = [];
 
-                    mediaRecorder.ondataavailable = event => {
-                        audioChunks.push(event.data);
-                    };
+                    mediaRecorder.ondataavailable = event => { audioChunks.push(event.data); };
 
                     mediaRecorder.onstop = () => {
                         const audioBlob = new Blob(audioChunks, { type: 'audio/webm' });
@@ -306,9 +334,10 @@
             
             if (!isFromRoulette) {
                 currentQuestionText = "";
-                document.getElementById('question-text').innerText = "주제를 선택하면 질문이 나타납니다."; 
+                isTextVisible = false;
+                document.getElementById('question-text').innerText = "왼쪽 위에서 유형을 고르고\n주제를 선택해 주세요."; 
                 document.getElementById('replayBtn').classList.add('hidden');
-                document.getElementById('showQuestionBtn').classList.add('hidden');
+                document.getElementById('toggleQuestionBtn').classList.add('hidden');
             }
         }
     </script>
